@@ -1,1 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Smart Companion</title>
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+</head>
+<body class="light-mode theme-ocean">
 
+    <div class="app-wrapper">
+        <div class="navbar">
+            <div class="navbar-left">
+                <h2>Smart Companion</h2>
+            </div>
+            <div class="navbar-right">
+                <button onclick="toggleThemeMenu()" class="access-btn">Themes</button>
+                <button onclick="toggleVoice()" class="access-btn" id="voiceBtn">Voice</button>
+                <button onclick="logout()" class="access-btn">Logout</button>
+            </div>
+        </div>
+
+        <div class="theme-menu hidden" id="themeMenu">
+            <button onclick="switchTheme('ocean')">Ocean</button>
+            <button onclick="switchTheme('sunset')">Sunset</button>
+            <button onclick="switchTheme('forest')">Forest</button>
+            <button onclick="switchTheme('gold')">Gold</button>
+            <button onclick="switchTheme('night')">Night</button>
+            <button onclick="switchTheme('cyber')">Cyber</button>
+        </div>
+
+        <div class="container">
+            <h1>What's the goal?</h1>
+
+            <div id="input-section">
+                <div class="input-group">
+                    <input type="text" id="goalInput" placeholder="e.g., Clean the kitchen...">
+                    <button onclick="startListening()" class="mic-btn" title="Speak">MIC</button>
+                </div>
+
+                <button onclick="getSteps()" class="main-btn">Break it Down</button>
+            </div>
+
+            <div id="task-container" class="hidden">
+                <div class="progress-container">
+                    <div id="progress-bar" class="progress-bar-fill"></div>
+                </div>
+
+                <div class="card">
+                    <h2 id="current-step-text">Loading...</h2>
+                </div>
+
+                <button class="done-btn" onclick="completeTask()">Done</button>
+                <button class="skip-btn" onclick="skipStep()">Skip</button>
+                <button class="back-btn hidden" onclick="goBack()">Back</button>
+                <button class="restart-btn hidden" onclick="restart()">Restart</button>
+            </div>
+
+            <div id="stats-section">
+                <h3>Your Progress</h3>
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-number" id="tasksCompleted">0</div>
+                        <div class="stat-label">Tasks Completed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="stepsCompleted">0</div>
+                        <div class="stat-label">Micro-Wins Unlocked</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js"></script>
+    <script src="/static/firebase-config.js"></script>
+
+    <script src="/static/script.js"></script>
+    <script src="/static/themes.js"></script>
+</body>
+</html>
