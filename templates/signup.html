@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - Smart Companion</title>
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Lexend', 'Segoe UI', sans-serif;
+            background: #0a0a0a;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+
+        /* Professional background pattern */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 25% 25%, rgba(230, 57, 70, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 75% 75%, rgba(230, 57, 70, 0.03) 0%, transparent 50%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .auth-container {
+            background: #0f0f0f;
+            border: 1px solid #333333;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 450px;
+            padding: 50px 40px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .auth-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: #e63946;
+        }
+
+        h1 {
+            color: #e63946;
+            margin-bottom: 10px;
+            font-size: 2.2em;
+            font-weight: 300;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .subtitle {
+            color: #cccccc;
+            margin-bottom: 35px;
+            font-size: 1rem;
+            font-weight: 300;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: #ffffff;
+            font-weight: 500;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+        }
+
+        input {
+            width: 100%;
+            padding: 15px 20px;
+            border: 2px solid #333333;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-family: 'Lexend', sans-serif;
+            transition: all 0.3s ease;
+            background: #1a1a1a;
+            color: #ffffff;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #e63946;
+            background: #0f0f0f;
+        }
+
+        input::placeholder {
+            color: #666666;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Lexend', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-primary {
+            background: #e63946;
+            color: #0a0a0a;
+            margin-top: 25px;
+            box-shadow: 0 4px 15px rgba(230, 57, 70, 0.2);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(230, 57, 70, 0.3);
+        }
+
+        .toggle-link {
+            text-align: center;
+            margin-top: 25px;
+            padding-top: 25px;
+            border-top: 1px solid #333333;
+        }
+
+        a {
+            color: #e63946;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        a:hover {
+            color: #ff5a66;
+        }
+
+        .error {
+            color: #ffffff;
+            background: rgba(230, 57, 70, 0.1);
+            border: 1px solid #e63946;
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            font-size: 0.9rem;
+        }
+
+        .success {
+            color: #ffffff;
+            background: rgba(45, 106, 79, 0.1);
+            border: 1px solid #2d6a4f;
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            font-size: 0.9rem;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            color: #e63946;
+            margin-top: 15px;
+            font-weight: 500;
+        }
+
+        @media (max-width: 768px) {
+            .auth-container {
+                padding: 40px 30px;
+                margin: 20px;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <h1>Join Us</h1>
+        <p class="subtitle">Create your Smart Companion Account</p>
+
+        <div class="error" id="errorMsg"></div>
+        <div class="success" id="successMsg"></div>
+
+        <form id="signupForm">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" placeholder="Choose a username" required>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" placeholder="your@email.com" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="At least 6 characters" required>
+            </div>
+
+            <div class="form-group">
+                <label for="confirmPassword">Confirm Password</label>
+                <input type="password" id="confirmPassword" placeholder="Confirm your password" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Create Account</button>
+            <div class="loading" id="loading">Creating account...</div>
+        </form>
+
+        <div class="toggle-link">
+            Already have an account? <a href="/">Login</a>
+        </div>
+    </div>
+
+    <script type="module">
+        import { auth, database } from '/static/firebase-config.js';
+        import { createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+        import { ref, set } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js";
+
+        console.log('Signup page loaded');
+        console.log('Auth object:', auth);
+        console.log('Database object:', database);
+
+        document.getElementById('signupForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const loading = document.getElementById('loading');
+            const errorDiv = document.getElementById('errorMsg');
+            const successDiv = document.getElementById('successMsg');
+
+            console.log('Signup attempt:', email);
+
+            if (password !== confirmPassword) {
+                errorDiv.textContent = 'Passwords do not match';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            if (password.length < 6) {
+                errorDiv.textContent = 'Password must be at least 6 characters';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+            loading.style.display = 'block';
+
+            try {
+                console.log('Creating Firebase user...');
+
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+
+                console.log('User created:', user.uid);
+
+                // Save to database
+                const userData = {
+                    username: username,
+                    email: email,
+                    createdAt: new Date().toISOString(),
+                    theme_preference: 'ocean',
+                    total_tasks_completed: 0
+                };
+
+                await set(ref(database, `users/${user.uid}`), userData);
+                console.log('User data saved to Firebase');
+
+                successDiv.textContent = 'Account created! Redirecting...';
+                successDiv.style.display = 'block';
+
+                // Store in localStorage
+                localStorage.setItem('user', JSON.stringify({
+                    uid: user.uid,
+                    email: user.email,
+                    username: username
+                }));
+
+                setTimeout(() => {
+                    window.location.href = '/welcome';
+                }, 1500);
+
+            } catch (error) {
+                console.error('Error:', error.code, error.message);
+
+                let errorMsg = error.message;
+                
+                if (error.code === 'auth/email-already-in-use') {
+                    errorMsg = 'Email already registered';
+                } else if (error.code === 'auth/weak-password') {
+                    errorMsg = 'Password too weak';
+                } else if (error.code === 'auth/invalid-email') {
+                    errorMsg = 'Invalid email';
+                }
+
+                errorDiv.textContent = errorMsg;
+                errorDiv.style.display = 'block';
+
+            } finally {
+                loading.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
