@@ -32,8 +32,8 @@ A Flask-based web application designed to act as an executive function coach for
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/imdhirru/neurothon-2.git
-   cd neurothon-2
+   git clone https://github.com/imdhirru/Glade.git
+   cd Glade
    ```
 
 2. **Create a virtual environment**
