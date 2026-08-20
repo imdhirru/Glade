@@ -1,4 +1,4 @@
-# Smart Companion - Neurothon Project 🧠✨
+# GLADE AI - BREAKDOWN YOUR PROBLEMS
 
 A Flask-based web application designed to act as an executive function coach for individuals with ADHD/Autism. It leverages Google's Generative AI (Gemini) to break down overwhelming tasks into manageable "Micro-Wins".
 
