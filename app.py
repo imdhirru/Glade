@@ -1,8 +1,12 @@
 from flask import Flask, render_template, request, jsonify
+from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from google import genai
 from google.genai import types
 import os
 import json
+import logging
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import secrets
@@ -11,11 +15,68 @@ import random
 import string
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from functools import wraps
 
 load_dotenv()
 
+# ============ LOGGING CONFIGURATION ============
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# ============ ENVIRONMENT VALIDATION ============
+def validate_environment():
+    """Validate required environment variables on startup"""
+    required_vars = ['SECRET_KEY', 'GEMINI_API_KEY', 'FIREBASE_API_KEY']
+    missing = [var for var in required_vars if not os.getenv(var)]
+    
+    if missing:
+        logger.error(f"Missing required environment variables: {', '.join(missing)}")
+        raise ValueError(f"Missing required env vars: {', '.join(missing)}")
+    
+    logger.info("✅ All required environment variables configured")
+
+# Validate on startup
+try:
+    validate_environment()
+except ValueError as e:
+    logger.error(f"Startup failed: {e}")
+    raise
+
+# ============ CONSTANTS ============
+OTP_LENGTH = 6
+TOKEN_EXPIRY_HOURS = 1
+OTP_EXPIRY_MINUTES = 5
+MAX_GOAL_LENGTH = 500
+RATE_LIMIT_OTP = "5 per minute"
+RATE_LIMIT_RESET = "3 per minute"
+RATE_LIMIT_DECOMPOSE = "20 per minute"
+
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-me-in-production')
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
+
+# Enable CORS for all routes
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+# Initialize rate limiter
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"]
+)
+
+# ============ SECURITY HEADERS ============
+@app.after_request
+def set_security_headers(response):
+    """Add security headers to all responses"""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' fonts.googleapis.com; font-src fonts.gstatic.com"
+    return response
 
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
@@ -51,14 +112,15 @@ def send_reset_email(to_email, token):
     """
     try:
         if not GMAIL_EMAIL or not GMAIL_PASSWORD:
-            print("⚠️  Gmail credentials not configured. Skipping email send.")
-            print(f"📋 Reset Token (for manual testing): {token}")
+            logger.warning("Gmail credentials not configured. Skipping email send.")
+            logger.info(f"Reset Token (for manual testing): {token[:20]}...")
             return True
 
         # Create email
         subject = "🔐 Smart Companion - Reset Your Password"
         
-        reset_link = f"http://localhost:5000/password-reset?token={token}&email={to_email}"
+        app_url = os.getenv('APP_URL', 'http://localhost:5000')
+        reset_link = f"{app_url}/password-reset?token={token}&email={to_email}"
         
         body = f"""
         <html>
@@ -106,21 +168,21 @@ def send_reset_email(to_email, token):
         msg.attach(MIMEText(body, 'html'))
         
         # Send email
-        print(f"📧 Sending reset email to: {to_email}")
+        logger.info(f"Sending reset email to: {to_email}")
         
         with smtplib.SMTP('smtp.gmail.com', 587) as server:
             server.starttls()
             server.login(GMAIL_EMAIL, GMAIL_PASSWORD)
             server.send_message(msg)
         
-        print(f"✅ Email sent successfully to: {to_email}")
+        logger.info(f"Reset email sent successfully to: {to_email}")
         return True
         
     except smtplib.SMTPAuthenticationError:
-        print("❌ Gmail authentication failed. Check GMAIL_EMAIL and GMAIL_PASSWORD in .env")
+        logger.error("Gmail authentication failed. Check GMAIL_EMAIL and GMAIL_PASSWORD in .env")
         return False
     except Exception as e:
-        print(f"❌ Error sending email: {e}")
+        logger.error(f"Error sending reset email: {e}")
         return False
 
 def send_otp_email(to_email, otp):
@@ -129,7 +191,7 @@ def send_otp_email(to_email, otp):
     """
     try:
         if not GMAIL_EMAIL or not GMAIL_PASSWORD:
-            print("⚠️  Gmail not configured")
+            logger.warning("Gmail not configured for OTP sending")
             return False
 
         subject = "🔐 Smart Companion - Your Password Reset OTP"
@@ -169,18 +231,18 @@ def send_otp_email(to_email, otp):
         msg['To'] = to_email
         msg.attach(MIMEText(body, 'html'))
         
-        print(f"📧 Sending OTP to: {to_email}")
+        logger.info(f"Sending OTP to: {to_email}")
         
         with smtplib.SMTP('smtp.gmail.com', 587) as server:
             server.starttls()
             server.login(GMAIL_EMAIL, GMAIL_PASSWORD)
             server.send_message(msg)
         
-        print(f"✅ OTP email sent to: {to_email}")
+        logger.info(f"OTP email sent successfully to: {to_email}")
         return True
         
     except Exception as e:
-        print(f"❌ Error sending OTP email: {e}")
+        logger.error(f"Error sending OTP email: {e}")
         return False
 
 # ============ PAGE ROUTES ============
@@ -220,7 +282,7 @@ def reset_password():
     data = request.json
     email = data.get('email', '').strip()
 
-    print(f"📧 Password reset request: {email}")
+    logger.info(f"Password reset request for: {email}")
 
     if not email:
         return jsonify({"error": "Email is required"}), 400
@@ -228,16 +290,15 @@ def reset_password():
     # Generate reset token
     reset_token = secrets.token_urlsafe(32)
     
-    # Store token with expiration (1 hour)
+    # Store token with expiration
     reset_tokens[email] = {
         'token': reset_token,
         'created_at': datetime.now().isoformat(),
-        'expires_at': (datetime.now() + timedelta(hours=1)).isoformat()
+        'expires_at': (datetime.now() + timedelta(hours=TOKEN_EXPIRY_HOURS)).isoformat()
     }
 
-    print(f"✅ Reset token generated for: {email}")
-    print(f"🔑 Reset Token: {reset_token}")
-
+    logger.info(f"Reset token generated for: {email}")
+    
     # Try to send email
     email_sent = send_reset_email(email, reset_token)
 
@@ -258,7 +319,7 @@ def confirm_reset():
     email = data.get('email', '').strip()
     token = data.get('token', '').strip()
 
-    print(f"🔐 Password reset confirmation: {email}")
+    logger.info(f"Password reset confirmation for: {email}")
 
     if not email or not token:
         return jsonify({"error": "Missing email or token"}), 400
@@ -280,7 +341,7 @@ def confirm_reset():
         return jsonify({"error": "Reset token expired. Request a new one."}), 401
 
     # Token is valid
-    print(f"✅ Token verified for: {email}")
+    logger.info(f"Token verified for: {email}")
 
     return jsonify({
         "success": True,
@@ -326,34 +387,35 @@ def cleanup_reset_token():
 
     if email in reset_tokens:
         del reset_tokens[email]
-        print(f"🗑️ Reset token cleaned up for: {email}")
+        logger.info(f"Reset token cleaned up for: {email}")
 
     return jsonify({"success": True}), 200
 
 # ============ AUTH API - PASSWORD RESET (OTP METHOD) ============
 
 @app.route('/api/auth/generate-otp', methods=['POST'])
+@limiter.limit(RATE_LIMIT_OTP)
 def generate_otp():
     """Generate and send OTP via email"""
     data = request.json
     email = data.get('email', '').strip()
 
-    print(f"📧 OTP generation request for: {email}")
-
     if not email:
         return jsonify({"error": "Email is required"}), 400
 
-    # Generate 6-digit OTP
-    otp = ''.join(random.choices(string.digits, k=6))
+    logger.info(f"OTP generation request for: {email}")
+
+    # Generate OTP
+    otp = ''.join(random.choices(string.digits, k=OTP_LENGTH))
     
-    # Store OTP with expiration (5 minutes)
+    # Store OTP with expiration
     otp_storage[email] = {
         'otp': otp,
         'created_at': datetime.now().isoformat(),
-        'expires_at': (datetime.now() + timedelta(minutes=5)).isoformat()
+        'expires_at': (datetime.now() + timedelta(minutes=OTP_EXPIRY_MINUTES)).isoformat()
     }
 
-    print(f"✅ OTP generated: {otp}")
+    logger.info(f"OTP generated for: {email} (length: {len(otp)})")
 
     # Send OTP via email
     email_sent = send_otp_email(email, otp)
@@ -374,7 +436,7 @@ def verify_otp():
     email = data.get('email', '').strip()
     otp = data.get('otp', '').strip()
 
-    print(f"🔑 OTP verification for: {email}")
+    logger.info(f"OTP verification for: {email}")
 
     if not email or not otp:
         return jsonify({"error": "Missing email or OTP"}), 400
@@ -392,7 +454,7 @@ def verify_otp():
         del otp_storage[email]
         return jsonify({"error": "OTP expired"}), 401
 
-    print(f"✅ OTP verified for: {email}")
+    logger.info(f"OTP verified for: {email}")
     return jsonify({"valid": True, "email": email}), 200
 
 
@@ -406,7 +468,7 @@ def verify_otp_for_reset():
     email = data.get('email', '').strip()
     otp = data.get('otp', '').strip()
 
-    print(f"🔐 OTP verification for password reset: {email}")
+    logger.info(f"OTP verification for password reset: {email}")
 
     if not email or not otp:
         return jsonify({"error": "Missing email or OTP"}), 400
@@ -433,7 +495,7 @@ def verify_otp_for_reset():
         'expires_at': (datetime.now() + timedelta(minutes=10)).isoformat()
     }
 
-    print(f"✅ OTP verified, reset session created for: {email}")
+    logger.info(f"OTP verified, reset session created for: {email}")
     
     return jsonify({
         "success": True,
@@ -451,7 +513,7 @@ def reset_password_with_otp():
     current_password = data.get('current_password', '')
     new_password = data.get('new_password', '')
 
-    print(f"🔐 Password reset request for: {email}")
+    logger.info(f"Password reset request for: {email}")
 
     if not email or not current_password or not new_password:
         return jsonify({"error": "Missing required fields"}), 400
@@ -470,7 +532,7 @@ def reset_password_with_otp():
         del verified_reset_sessions[email]
         return jsonify({"error": "Reset session expired. Please start over."}), 403
 
-    print(f"✅ Verified session found for: {email}")
+    logger.info(f"Verified reset session found for: {email}")
     
     try:
         firebase_api_key = FIREBASE_API_KEY
@@ -478,7 +540,7 @@ def reset_password_with_otp():
         # Step 1: Sign in with current password to get idToken
         signin_url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={firebase_api_key}"
         
-        print(f"� Signing in with current password...")
+        logger.info("Signing in with current password...")
         
         signin_response = requests.post(signin_url, json={
             "email": email,
@@ -490,7 +552,7 @@ def reset_password_with_otp():
         
         if 'error' in signin_data:
             error_msg = signin_data['error'].get('message', 'Unknown error')
-            print(f"❌ Sign-in error: {error_msg}")
+            logger.error(f"Sign-in error: {error_msg}")
             if 'INVALID_PASSWORD' in error_msg or 'INVALID_LOGIN_CREDENTIALS' in error_msg:
                 return jsonify({"error": "Incorrect current password"}), 401
             return jsonify({"error": f"Sign-in failed: {error_msg}"}), 500
@@ -498,13 +560,13 @@ def reset_password_with_otp():
         id_token = signin_data.get('idToken')
         
         if not id_token:
-            print(f"❌ No idToken in response")
+            logger.error("No idToken in response")
             return jsonify({"error": "Authentication failed"}), 500
         
         # Step 2: Update password using the idToken
         update_url = f"https://identitytoolkit.googleapis.com/v1/accounts:update?key={firebase_api_key}"
         
-        print(f"🔐 Updating password...")
+        logger.info("Updating password...")
         
         update_response = requests.post(update_url, json={
             "idToken": id_token,
@@ -516,13 +578,13 @@ def reset_password_with_otp():
         
         if 'error' in update_data:
             error_msg = update_data['error'].get('message', 'Unknown error')
-            print(f"❌ Password update error: {error_msg}")
+            logger.error(f"Password update error: {error_msg}")
             return jsonify({"error": f"Failed to update password: {error_msg}"}), 500
         
         # Clean up verified session
         del verified_reset_sessions[email]
         
-        print(f"✅ Password updated successfully for: {email}")
+        logger.info(f"Password updated successfully for: {email}")
         
         return jsonify({
             "success": True,
@@ -530,12 +592,8 @@ def reset_password_with_otp():
         }), 200
         
     except Exception as e:
-        print(f"❌ Error: {str(e)}")
-        return jsonify({"error": f"Failed to reset password: {str(e)}"}), 500
-        
-    except Exception as e:
-        print(f"❌ Error: {str(e)}")
-        return jsonify({"error": f"Failed to send reset email: {str(e)}"}), 500
+        logger.error(f"Error resetting password: {str(e)}")
+        return jsonify({"error": "Failed to reset password"}), 500
 
 
 @app.route('/api/auth/cleanup-otp', methods=['POST'])
@@ -546,27 +604,30 @@ def cleanup_otp():
 
     if email in otp_storage:
         del otp_storage[email]
-        print(f"🗑️ OTP cleaned up for: {email}")
+        logger.info(f"OTP cleaned up for: {email}")
 
     return jsonify({"success": True}), 200
 
 # ============ API ROUTES - TASK DECOMPOSITION ============
 
 @app.route('/api/decompose', methods=['POST'])
+@limiter.limit(RATE_LIMIT_DECOMPOSE)
 def decompose_task():
     """
     Break down a task into micro-wins using Gemini AI
     """
     data = request.json
-    goal = data.get('goal')
+    goal = data.get('goal', '').strip() if data else ''
     
+    # Input validation
     if not goal:
         return jsonify({"error": "No goal provided"}), 400
+    
+    if len(goal) > MAX_GOAL_LENGTH:
+        return jsonify({"error": f"Goal must be under {MAX_GOAL_LENGTH} characters"}), 400
 
     try:
-        print(f"\n{'='*60}")
-        print(f"🤖 DECOMPOSING GOAL: {goal}")
-        print(f"{'='*60}")
+        logger.info(f"Decomposing goal: {goal[:100]}...")
         
         response = client.models.generate_content(
             model=MODEL_NAME,
@@ -577,15 +638,12 @@ def decompose_task():
             )
         )
         
-        print(f"✅ Got response from Gemini")
+        logger.info("Got response from Gemini")
         
         clean_text = response.text.replace('```json', '').replace('```', '').strip()
         steps = json.loads(clean_text)
         
-        print(f"✅ Parsed {len(steps)} steps")
-        for i, step in enumerate(steps, 1):
-            print(f"   {i}. {step}")
-        print(f"{'='*60}\n")
+        logger.info(f"Parsed {len(steps)} steps successfully")
         
         return jsonify({
             "success": True,
@@ -593,12 +651,12 @@ def decompose_task():
         }), 200
         
     except json.JSONDecodeError as e:
-        print(f"❌ JSON Parse Error: {str(e)}")
-        return jsonify({"error": f"Failed to parse AI response"}), 500
+        logger.error(f"JSON Parse Error: {str(e)}")
+        return jsonify({"error": "Failed to parse AI response"}), 500
         
     except Exception as e:
         error_msg = str(e)
-        print(f"❌ ERROR: {error_msg}")
+        logger.error(f"Decompose error: {error_msg}")
         
         if "429" in error_msg or "quota" in error_msg.lower():
             return jsonify({"error": "Rate limit reached. Try again later."}), 429
@@ -606,7 +664,48 @@ def decompose_task():
         if "invalid_api_key" in error_msg or "unauthorized" in error_msg.lower():
             return jsonify({"error": "Invalid API key"}), 401
         
-        return jsonify({"error": f"Error: {error_msg}"}), 500
+        return jsonify({"error": "Failed to decompose task"}), 500
+
+# ============ TASK TRACKING API ============
+
+# In-memory task storage (should be moved to database)
+task_completions = {}
+
+@app.route('/api/task/<task_id>/complete-step', methods=['POST'])
+def complete_task_step(task_id: str):
+    """
+    Mark a task step as completed
+    """
+    try:
+        auth_token = request.headers.get('Authorization', '')
+        
+        if not auth_token:
+            return jsonify({"error": "Authentication required"}), 401
+        
+        data = request.json or {}
+        step_index = data.get('step_index', 0)
+        
+        # Store completion record
+        if task_id not in task_completions:
+            task_completions[task_id] = []
+        
+        task_completions[task_id].append({
+            'step_index': step_index,
+            'completed_at': datetime.now().isoformat()
+        })
+        
+        logger.info(f"Task step completed: {task_id} (step {step_index})")
+        
+        return jsonify({
+            "success": True,
+            "message": "Task step recorded",
+            "task_id": task_id,
+            "step_index": step_index
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error completing task step: {str(e)}")
+        return jsonify({"error": "Failed to record task completion"}), 500
 
 # ============ USER PROFILE API ============
 
@@ -651,34 +750,32 @@ def health_check():
 @app.errorhandler(404)
 def not_found(error):
     """Handle 404 errors"""
-    return jsonify({"error": "Route not found"}), 404
+    logger.warning(f"404 error: {request.path}")
+    return jsonify({"success": False, "error": "Route not found"}), 404
 
 @app.errorhandler(500)
 def server_error(error):
     """Handle 500 errors"""
-    print(f"❌ Server error: {error}")
-    return jsonify({"error": "Internal server error"}), 500
+    logger.error(f"500 error: {error}")
+    return jsonify({"success": False, "error": "Internal server error"}), 500
 
 # ============ MAIN ============
 
 if __name__ == '__main__':
-    print("\n" + "="*60)
-    print("🚀 SMART COMPANION - NEUROTHON PROJECT")
-    print("="*60)
-    print(f"✅ Flask initialized")
-    if os.getenv('GEMINI_API_KEY'):
-        print(f"✅ Gemini API: {os.getenv('GEMINI_API_KEY')[:20]}...")
-    else:
-        print(f"❌ Gemini API not configured")
-    print(f"✅ Secret key: configured")
-    print(f"✅ Firebase: configured")
-    if GMAIL_EMAIL and GMAIL_PASSWORD:
-        print(f"✅ Gmail: {GMAIL_EMAIL}")
-    else:
-        print(f"⚠️  Gmail: Not configured")
-    print(f"✅ OTP System: Ready with Email Sending")
-    print(f"✅ Firebase API Key: {FIREBASE_API_KEY[:20] if FIREBASE_API_KEY else 'Not configured'}...")
-    print(f"🌐 Server: http://localhost:5000")
-    print("="*60 + "\n")
+    logger.info("="*60)
+    logger.info("🚀 GLADE AI - EXECUTIVE FUNCTION COACH")
+    logger.info("="*60)
+    
+    # Log configuration status
+    logger.info(f"Flask initialized")
+    logger.info(f"Gemini API: {'✅ Configured' if os.getenv('GEMINI_API_KEY') else '❌ Not configured'}")
+    logger.info(f"Secret key: ✅ Configured")
+    logger.info(f"Firebase: {'✅ Configured' if os.getenv('FIREBASE_API_KEY') else '❌ Not configured'}")
+    logger.info(f"Gmail: {'✅ ' + os.getenv('GMAIL_EMAIL', '') if os.getenv('GMAIL_EMAIL') else '⚠️ Not configured'}")
+    logger.info(f"Rate limiting: ✅ Enabled")
+    logger.info(f"CORS: ✅ Enabled")
+    logger.info(f"Security headers: ✅ Enabled")
+    logger.info(f"🌐 Server: {os.getenv('APP_URL', 'http://localhost:5000')}")
+    logger.info("="*60)
     
     app.run(debug=True, host='127.0.0.1', port=5000)
