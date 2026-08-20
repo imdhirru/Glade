@@ -1,0 +1,144 @@
+/* Analysis Animation Styles */
+
+.analysis-animation {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+  margin-top: 60px;
+  animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animation-container {
+  text-align: center;
+}
+
+.animated-dots {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 24px;
+  height: 40px;
+  align-items: center;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #667eea;
+  animation: pulse 1.4s infinite;
+}
+
+.dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes pulse {
+  0%, 80%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+.analysis-text {
+  font-size: 1.2rem;
+  color: #667eea;
+  font-weight: 500;
+  min-height: 28px;
+  animation: textFade 2s ease-in-out;
+}
+
+@keyframes textFade {
+  0% {
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Progress Steps */
+.progress-steps {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+}
+
+.step-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #a0aec0;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.step-indicator.active {
+  background: #667eea;
+  color: white;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.step-indicator:not(.active):not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 100%;
+  width: 20px;
+  height: 2px;
+  background: #cbd5e0;
+  margin-left: 6px;
+}
+
+.step-indicator {
+  position: relative;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .analysis-animation {
+    gap: 30px;
+    margin-top: 40px;
+  }
+
+  .analysis-text {
+    font-size: 1rem;
+  }
+
+  .step-indicator {
+    width: 36px;
+    height: 36px;
+    font-size: 0.85rem;
+  }
+}

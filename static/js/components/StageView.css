@@ -1,0 +1,156 @@
+/* Stage View Styles */
+
+.stage-container {
+  margin-bottom: 20px;
+}
+
+.stage-card {
+  background: white;
+  border-left: 4px solid #cbd5e0;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.stage-container.stage-completed .stage-card {
+  border-left-color: #48bb78;
+  background: #f0fff4;
+}
+
+.stage-container.stage-in_progress .stage-card {
+  border-left-color: #ed8936;
+  background: #fffaf0;
+}
+
+.stage-container.stage-pending .stage-card {
+  border-left-color: #cbd5e0;
+}
+
+.stage-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.stage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px;
+  gap: 16px;
+}
+
+.stage-info {
+  display: flex;
+  gap: 16px;
+  flex: 1;
+  align-items: flex-start;
+}
+
+.status-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.stage-text {
+  flex: 1;
+}
+
+.stage-name {
+  font-size: 1.1rem;
+  color: #1a202c;
+  margin: 0 0 8px 0;
+}
+
+.stage-description {
+  color: #718096;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.stage-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.micro-win-count {
+  color: #a0aec0;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.expand-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  cursor: pointer;
+  font-size: 1.2rem;
+  color: #718096;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.expand-button:hover {
+  background: #f7fafc;
+  border-color: #cbd5e0;
+}
+
+.expand-button.expanded {
+  color: #667eea;
+  background: #edf2f7;
+  border-color: #667eea;
+}
+
+.stage-content {
+  padding: 0 20px 20px 20px;
+  border-top: 1px solid #e2e8f0;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.micro-wins-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.no-wins-message {
+  color: #a0aec0;
+  font-size: 0.95rem;
+  padding: 16px;
+  text-align: center;
+  background: #f7fafc;
+  border-radius: 4px;
+  margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .stage-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .stage-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
